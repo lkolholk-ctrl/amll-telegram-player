@@ -34,16 +34,7 @@ if (window.Telegram?.WebApp) {
   }
 }
 
-// 2. Parse Query Parameters
-const urlParams = new URLSearchParams(window.location.search);
-const queryTitle = urlParams.get('title') || '';
-const queryArtist = urlParams.get('artist') || '';
-const queryId = urlParams.get('id') || '';
-const querySf = urlParams.get('sf') || 'us';
-const queryCover = urlParams.get('cover') || '';
-const queryAudio = urlParams.get('audio') || '';
-
-// DOM Elements
+// 2. DOM Elements
 const trackTitleEl = document.getElementById('track-title') as HTMLHeadingElement;
 const trackArtistEl = document.getElementById('track-artist') as HTMLParagraphElement;
 const coverImgEl = document.getElementById('cover-img') as HTMLImageElement;
@@ -66,13 +57,12 @@ const progressFill = document.getElementById('progress-fill') as HTMLElement;
 const currentTimeEl = document.getElementById('current-time') as HTMLElement;
 const totalTimeEl = document.getElementById('total-time') as HTMLElement;
 
-// Set initial Header info
-if (queryTitle) trackTitleEl.textContent = queryTitle;
-if (queryArtist) trackArtistEl.textContent = queryArtist;
-if (queryCover) {
-  coverImgEl.src = queryCover;
-  coverImgEl.classList.remove('hidden');
-}
+// Search Modal DOM
+const btnSearch = document.getElementById('btn-search') as HTMLButtonElement;
+const searchOverlay = document.getElementById('search-overlay') as HTMLElement;
+const btnCloseSearch = document.getElementById('btn-close-search') as HTMLButtonElement;
+const searchForm = document.getElementById('search-form') as HTMLFormElement;
+const searchInput = document.getElementById('search-input') as HTMLInputElement;
 
 // State
 let parsedLines: LyricLine[] = [];
@@ -82,7 +72,7 @@ let durationSec = 180; // default duration if no audio
 let lastTimeMs = performance.now();
 let playerInstance: LyricPlayer | null = null;
 let bgRenderer: BackgroundRender<MeshGradientRenderer> | null = null;
-let hasRealAudio = Boolean(queryAudio);
+let hasRealAudio = false;
 
 // 3. Initialize AMLL Mesh Gradient Background
 try {
@@ -90,11 +80,6 @@ try {
     bgRenderer = BackgroundRender.new(MeshGradientRenderer);
     const canvas = bgRenderer.getElement();
     bgContainerEl.appendChild(canvas);
-    if (queryCover) {
-      bgRenderer.setAlbum(queryCover).then(() => {
-        fallbackBgEl.style.opacity = '0.3';
-      }).catch((e) => console.warn('bg album set error:', e));
-    }
   }
 } catch (e) {
   console.warn('MeshGradientRenderer not supported, using fallback gradient:', e);
@@ -130,22 +115,6 @@ function formatTime(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s < 10 ? '0' : ''}${s}`;
-}
-
-// 5. Setup Audio if URL provided
-if (hasRealAudio) {
-  audioEl.src = queryAudio;
-  audioEl.addEventListener('loadedmetadata', () => {
-    if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
-      durationSec = audioEl.duration;
-      totalTimeEl.textContent = formatTime(durationSec);
-    }
-  });
-
-  audioEl.addEventListener('ended', () => {
-    pause();
-    seekTo(0);
-  });
 }
 
 function seekTo(targetSec: number) {
@@ -221,7 +190,20 @@ progressContainer.addEventListener('click', (e) => {
   seekTo(ratio * durationSec);
 });
 
-// 6. Main RAF Render Loop
+// Audio callbacks
+audioEl.addEventListener('loadedmetadata', () => {
+  if (Number.isFinite(audioEl.duration) && audioEl.duration > 0) {
+    durationSec = audioEl.duration;
+    totalTimeEl.textContent = formatTime(durationSec);
+  }
+});
+
+audioEl.addEventListener('ended', () => {
+  pause();
+  seekTo(0);
+});
+
+// 5. Main RAF Render Loop
 function renderLoop() {
   const now = performance.now();
   const delta = (now - lastTimeMs) / 1000;
@@ -249,21 +231,65 @@ function renderLoop() {
 }
 requestAnimationFrame(renderLoop);
 
-// 7. Fetch TTML and Load Lyrics
-async function loadLyrics() {
+// 6. Track Loader
+interface TrackOptions {
+  id?: string;
+  sf?: string;
+  title?: string;
+  artist?: string;
+  cover?: string;
+  audio?: string;
+}
+
+async function loadTrack(opts: TrackOptions) {
+  pause();
+  currentTimeSec = 0;
+  parsedLines = [];
+  updateUIProgress();
+
+  loadingSpinnerEl.classList.remove('hidden');
+  loadingTextEl.textContent = 'Загрузка слоговой лирики...';
+
+  const title = opts.title || (opts.id ? 'Apple Track' : 'Демо');
+  const artist = opts.artist || '';
+
+  trackTitleEl.textContent = title;
+  trackArtistEl.textContent = artist;
+
+  // Cover image
+  if (opts.cover) {
+    coverImgEl.src = opts.cover;
+    coverImgEl.classList.remove('hidden');
+    if (bgRenderer) {
+      bgRenderer.setAlbum(opts.cover).then(() => {
+        fallbackBgEl.style.opacity = '0.2';
+      }).catch((e) => console.warn('bg album set error:', e));
+    }
+  } else {
+    coverImgEl.classList.add('hidden');
+    fallbackBgEl.style.opacity = '1';
+  }
+
+  // Audio setup
+  if (opts.audio) {
+    hasRealAudio = true;
+    audioEl.src = opts.audio;
+    audioEl.load();
+  } else {
+    hasRealAudio = false;
+    audioEl.removeAttribute('src');
+  }
+
   try {
-    let fetchUrl = '/v2/lyrics/ttml';
+    const fetchUrl = '/v2/lyrics/ttml';
     const params = new URLSearchParams();
-    if (queryId) {
-      params.set('id', queryId);
-      params.set('sf', querySf);
-    } else if (queryTitle) {
-      params.set('title', queryTitle);
-      if (queryArtist) params.set('artist', queryArtist);
-      if (querySf) params.set('sf', querySf);
-    } else {
-      loadingTextEl.textContent = 'Укажите песню для отображения текста';
-      return;
+    if (opts.id) {
+      params.set('id', opts.id);
+      params.set('sf', opts.sf || 'us');
+    } else if (opts.title) {
+      params.set('title', opts.title);
+      if (opts.artist) params.set('artist', opts.artist);
+      if (opts.sf) params.set('sf', opts.sf);
     }
 
     const response = await fetch(`${fetchUrl}?${params.toString()}`);
@@ -276,8 +302,8 @@ async function loadLyrics() {
     const artistNameHeader = response.headers.get('X-Artist-Name');
     const timingHeader = (response.headers.get('X-Lyrics-Timing') || 'Word').toLowerCase();
 
-    if (trackNameHeader && !queryTitle) trackTitleEl.textContent = trackNameHeader;
-    if (artistNameHeader && !queryArtist) trackArtistEl.textContent = artistNameHeader;
+    if (trackNameHeader) trackTitleEl.textContent = decodeURIComponent(trackNameHeader);
+    if (artistNameHeader) trackArtistEl.textContent = decodeURIComponent(artistNameHeader);
 
     if (timingHeader === 'word') {
       timingBadgeEl.textContent = 'Apple TTML';
@@ -311,7 +337,7 @@ async function loadLyrics() {
       isDuet: Boolean(line.isDuet),
     }));
 
-    // Update estimated duration from last lyric line if no real audio
+    // Update duration estimate from last lyric line if no real audio
     const lastLine = parsedLines[parsedLines.length - 1];
     if (!hasRealAudio && lastLine && Number.isFinite(lastLine.endTime)) {
       durationSec = Math.ceil(lastLine.endTime / 1000) + 5;
@@ -325,10 +351,92 @@ async function loadLyrics() {
     // Hide spinner
     loadingSpinnerEl.classList.add('hidden');
     updateUIProgress();
+
+    // Auto-play demo or audio
+    play();
   } catch (err: any) {
     console.error('Failed to load lyrics:', err);
     loadingTextEl.textContent = 'Лирика не найдена или временно недоступна';
   }
 }
 
-loadLyrics();
+// 7. Search Modal Events
+btnSearch.addEventListener('click', () => {
+  searchOverlay.classList.remove('hidden');
+  searchInput.focus();
+  try {
+    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged();
+  } catch {}
+});
+
+btnCloseSearch.addEventListener('click', () => {
+  searchOverlay.classList.add('hidden');
+});
+
+searchOverlay.addEventListener('click', (e) => {
+  if (e.target === searchOverlay) {
+    searchOverlay.classList.add('hidden');
+  }
+});
+
+searchForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = searchInput.value.trim();
+  if (!q) return;
+
+  searchOverlay.classList.add('hidden');
+  searchInput.value = '';
+
+  let title = q;
+  let artist = '';
+  if (q.includes(' - ')) {
+    const parts = q.split(' - ');
+    artist = parts[0].trim();
+    title = parts.slice(1).join(' - ').trim();
+  } else if (q.includes(' — ')) {
+    const parts = q.split(' — ');
+    artist = parts[0].trim();
+    title = parts.slice(1).join(' — ').trim();
+  }
+
+  loadTrack({ title, artist });
+});
+
+// Quick suggestion chips
+document.querySelectorAll('.chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    const title = chip.getAttribute('data-title') || '';
+    const artist = chip.getAttribute('data-artist') || '';
+    searchOverlay.classList.add('hidden');
+    loadTrack({ title, artist });
+    try {
+      window.Telegram?.WebApp?.HapticFeedback?.selectionChanged();
+    } catch {}
+  });
+});
+
+// 8. Initial Load: from URL parameters or default demo
+const urlParams = new URLSearchParams(window.location.search);
+const initTitle = urlParams.get('title') || '';
+const initArtist = urlParams.get('artist') || '';
+const initId = urlParams.get('id') || '';
+const initSf = urlParams.get('sf') || 'us';
+const initCover = urlParams.get('cover') || '';
+const initAudio = urlParams.get('audio') || '';
+
+if (initId || initTitle) {
+  loadTrack({
+    id: initId,
+    sf: initSf,
+    title: initTitle,
+    artist: initArtist,
+    cover: initCover,
+    audio: initAudio,
+  });
+} else {
+  // Default interactive demo
+  loadTrack({
+    title: 'Numb',
+    artist: 'Linkin Park',
+  });
+}
