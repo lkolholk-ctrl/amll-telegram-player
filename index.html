@@ -6,14 +6,34 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 		<title>LMG Apple Music Karaoke</title>
 		<script src="https://telegram.org/js/telegram-web-app.js"></script>
-		<link rel="preconnect" href="https://fonts.googleapis.com">
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+		<link rel="preload" href="/player/fonts/golos_text.ttf" as="font" type="font/ttf" crossorigin>
 		<style>
+		@font-face {
+			font-family: "Golos Text";
+			src: url("/player/fonts/golos_text.ttf") format("truetype-variations"),
+			     url("/player/fonts/golos_text.ttf") format("truetype");
+			font-weight: 100 900;
+			font-style: normal;
+			font-display: swap;
+		}
+		@font-face {
+			font-family: "VK Sans Display";
+			src: url("/player/fonts/vk_sans_display_bold.ttf") format("truetype");
+			font-weight: 700 800;
+			font-style: normal;
+			font-display: swap;
+		}
+		@font-face {
+			font-family: "VK Sans Text";
+			src: url("/player/fonts/vk_sans_text_bold.ttf") format("truetype");
+			font-weight: 700 800;
+			font-style: normal;
+			font-display: swap;
+		}
 		:root {
 			background-color: #000000;
 			color: #ffffff;
-			font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+			font-family: "Golos Text", "VK Sans Text", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
 		}
 		body {
 			background-color: #000000;

@@ -124,8 +124,8 @@ export const usePlayerStore = defineStore("player", {
 			fadeWidth: 0.5,
 			enableBlur: true,
 			enableSpring: true,
-			fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
-			fontWeight: 700,
+			fontFamily: "'Golos Text', 'VK Sans Display', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
+			fontWeight: 800,
 			verticalSpring: {
 				mass: 1,
 				damping: 15,

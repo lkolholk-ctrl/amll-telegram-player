@@ -5,9 +5,34 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+	font-family: "Golos Text";
+	src: url("/player/fonts/golos_text.ttf") format("truetype-variations"),
+	     url("/player/fonts/golos_text.ttf") format("truetype");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "VK Sans Display";
+	src: url("/player/fonts/vk_sans_display_bold.ttf") format("truetype");
+	font-weight: 700 800;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "VK Sans Text";
+	src: url("/player/fonts/vk_sans_text_bold.ttf") format("truetype");
+	font-weight: 700 800;
+	font-style: normal;
+	font-display: swap;
+}
+
 @theme inline {
 	--font-sans:
-		-apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, "PingFang SC",
+		"Golos Text", "VK Sans Text", -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter,
 		system-ui, sans-serif;
 	--font-heading: var(--font-sans);
 	--color-sidebar-ring: var(--sidebar-ring);
@@ -121,9 +146,32 @@
 }
 
 .amll-lyric-player {
+	font-family: "Golos Text", "VK Sans Display", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif !important;
+	font-weight: 800 !important;
+	font-variation-settings: "wght" 800;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	letter-spacing: -0.02em;
 	transform: translateZ(0);
 	backface-visibility: hidden;
 	perspective: 1000px;
 	will-change: transform;
 }
 
+.amll-lyric-player [class*="_lyricLine"],
+.amll-lyric-player [class*="_lyricMainLine"],
+.amll-lyric-player [class*="_lyricWord"],
+.amll-lyric-player [class*="_emphasizeWrapper"] {
+	font-family: "Golos Text", "VK Sans Display", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif !important;
+	font-weight: 800 !important;
+	font-variation-settings: "wght" 800 !important;
+	letter-spacing: -0.02em;
+}
+
+.amll-lyric-player [class*="_bottomLine"] {
+	font-family: "Golos Text", "VK Sans Text", system-ui, sans-serif !important;
+	font-weight: 600 !important;
+	font-variation-settings: "wght" 600 !important;
+	letter-spacing: normal;
+	opacity: 0.5;
+}
