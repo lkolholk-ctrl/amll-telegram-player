@@ -2,6 +2,7 @@
 import {
 	DomLyricPlayer,
 	type LyricLineMouseEvent,
+	type SpringParams,
 } from "@applemusic-like-lyrics/core";
 import {
 	PauseIcon,
@@ -18,9 +19,40 @@ import { audioRuntime } from "@/runtime/audio";
 import { backgroundRuntime } from "@/runtime/background";
 import { PRESET_TRACKS, usePlayerStore } from "@/stores/player";
 
+/**
+ * Subclass of DomLyricPlayer tailored for luxury fluid autoscroll:
+ * Applies critically-damped Apple Music iPad spring physics (zeta ~ 1.125, soft: true)
+ * eliminating abrupt snaps and producing a velvety ~420ms glide.
+ */
+class SmoothLyricPlayer extends DomLyricPlayer {
+	override setLinePosYSpringParams(params: Partial<SpringParams> = {}): void {
+		const targetK = params.stiffness
+			? Math.min(115, Math.max(80, params.stiffness * 0.58))
+			: 100;
+		const targetD = Math.sqrt(targetK) * 2.25;
+		super.setLinePosYSpringParams({
+			...params,
+			mass: 1.0,
+			stiffness: targetK,
+			damping: targetD,
+			soft: true,
+		});
+	}
+
+	override setLineScaleSpringParams(params: Partial<SpringParams> = {}): void {
+		super.setLineScaleSpringParams({
+			...params,
+			mass: 1.0,
+			stiffness: 85,
+			damping: 20,
+			soft: true,
+		});
+	}
+}
+
 const player = usePlayerStore();
 const playerEl = ref<HTMLElement | null>(null);
-const lyricPlayerRef = shallowRef<DomLyricPlayer>();
+const lyricPlayerRef = shallowRef<SmoothLyricPlayer>();
 
 let frameId = 0;
 let lastFrameTime = -1;
@@ -95,10 +127,26 @@ function onProgressClick(e: MouseEvent): void {
 function applyLyricSettings(): void {
 	const lyricPlayer = lyricPlayerRef.value;
 	if (!lyricPlayer) return;
-	lyricPlayer.setWordFadeWidth(player.lyric.fadeWidth);
+	lyricPlayer.setWordFadeWidth(0.7);
 	lyricPlayer.setEnableBlur(player.lyric.enableBlur);
 	lyricPlayer.setEnableSpring(player.lyric.enableSpring);
 	lyricPlayer.setEnableAutoSeekDetection(false);
+	lyricPlayer.setAlignPosition(0.38);
+	lyricPlayer.setOverscanPx(400);
+
+	lyricPlayer.setLinePosYSpringParams({
+		mass: 1.0,
+		stiffness: 95,
+		damping: 22,
+		soft: true,
+	});
+
+	lyricPlayer.setLineScaleSpringParams({
+		mass: 1.0,
+		stiffness: 85,
+		damping: 20,
+		soft: true,
+	});
 }
 
 function mountBackground(): void {
@@ -323,7 +371,7 @@ onMounted(() => {
 	audioRuntime.attachStore(player);
 	audioRuntime.mount(host);
 
-	const lyricPlayer = new DomLyricPlayer();
+	const lyricPlayer = new SmoothLyricPlayer();
 	lyricPlayer.addEventListener("line-click", onLineClick);
 	host.appendChild(lyricPlayer.getElement());
 	lyricPlayerRef.value = lyricPlayer;

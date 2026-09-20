@@ -119,3 +119,11 @@
 ::selection {
 	background-color: color-mix(in oklab, var(--primary) 40%, transparent);
 }
+
+.amll-lyric-player {
+	transform: translateZ(0);
+	backface-visibility: hidden;
+	perspective: 1000px;
+	will-change: transform;
+}
+
