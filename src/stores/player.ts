@@ -147,8 +147,8 @@ export const usePlayerStore = defineStore("player", {
 				: query.get("bg") === "isolation"
 					? "isolation"
 					: "mg") as BackgroundRendererMode,
-			scale: 1,
-			fps: 60,
+			scale: 0.5,
+			fps: 30,
 			flowSpeed: 0.2,
 			isolation: {
 				lightWave: false,

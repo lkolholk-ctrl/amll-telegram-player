@@ -24,6 +24,7 @@ const lyricPlayerRef = shallowRef<DomLyricPlayer>();
 
 let frameId = 0;
 let lastFrameTime = -1;
+let lastStoreSyncTime = 0;
 let lyricLoadRevision = 0;
 
 // Search modal state
@@ -97,8 +98,7 @@ function applyLyricSettings(): void {
 	lyricPlayer.setWordFadeWidth(player.lyric.fadeWidth);
 	lyricPlayer.setEnableBlur(player.lyric.enableBlur);
 	lyricPlayer.setEnableSpring(player.lyric.enableSpring);
-	lyricPlayer.setLinePosYSpringParams({ ...player.lyric.verticalSpring });
-	lyricPlayer.setLineScaleSpringParams({ ...player.lyric.scaleSpring });
+	lyricPlayer.setEnableAutoSeekDetection(false);
 }
 
 function mountBackground(): void {
@@ -148,7 +148,6 @@ async function loadLyric(): Promise<void> {
 		const songwriters = extractSongwriters(metadata);
 		applySongwriters(songwriters);
 
-		// If playing, keep in sync
 		if (player.audio.playing) {
 			lyricPlayer.resume();
 		}
@@ -194,9 +193,13 @@ function startFrameLoop(): void {
 		const lyricPlayer = lyricPlayerRef.value;
 
 		if (!audioRuntime.isPaused) {
-			const currentTime = audioRuntime.currentTime;
-			player.syncCurrentTime(currentTime);
-			lyricPlayer?.setCurrentTime(Math.round(currentTime * 1000));
+			const smooth = audioRuntime.smoothTime;
+			lyricPlayer?.setCurrentTime(Math.round(smooth * 1000));
+
+			if (time - lastStoreSyncTime >= 150) {
+				lastStoreSyncTime = time;
+				player.syncCurrentTime(smooth);
+			}
 		}
 
 		lyricPlayer?.update(delta);
@@ -236,7 +239,6 @@ function selectPresetTrack(item: typeof PRESET_TRACKS[0]): void {
 	player.source.lyricName = `${item.title}.ttml`;
 	isSearchOpen.value = false;
 	triggerHaptic("medium");
-	// Auto play selected track
 	setTimeout(() => {
 		togglePlay();
 	}, 200);
@@ -262,7 +264,6 @@ function handleSearchSubmit(): void {
 	player.source.musicName = artist ? `${artist} — ${title}` : title;
 	player.source.lyricName = `${title}.ttml`;
 
-	// Auto search Apple Cover & Preview
 	fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=1`)
 		.then((r) => r.json())
 		.then((data) => {
@@ -401,14 +402,6 @@ watch(
 		player.lyric.fadeWidth,
 		player.lyric.enableBlur,
 		player.lyric.enableSpring,
-		player.lyric.verticalSpring.mass,
-		player.lyric.verticalSpring.damping,
-		player.lyric.verticalSpring.stiffness,
-		player.lyric.verticalSpring.soft,
-		player.lyric.scaleSpring.mass,
-		player.lyric.scaleSpring.damping,
-		player.lyric.scaleSpring.stiffness,
-		player.lyric.scaleSpring.soft,
 	],
 	() => applyLyricSettings(),
 );
@@ -467,7 +460,7 @@ watch(
 					@click.stop="onProgressClick"
 				>
 					<div
-						class="h-full bg-white rounded-full transition-all duration-75"
+						class="h-full bg-white rounded-full transition-[width] duration-150 ease-out"
 						:style="{ width: `${progressPercent}%` }"
 					/>
 				</div>

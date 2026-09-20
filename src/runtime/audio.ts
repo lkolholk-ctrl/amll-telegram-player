@@ -7,6 +7,11 @@ class AudioRuntime {
 	private store: PlayerStore | undefined;
 	private source = "";
 
+	private anchorAudioTime = 0;
+	private anchorWallTime = 0;
+	private lastAudioTime = 0;
+	private clockInitialized = false;
+
 	constructor() {
 		this.audio.preload = "auto";
 		this.audio.volume = 1.0;
@@ -27,10 +32,12 @@ class AudioRuntime {
 	}
 
 	private readonly onPlay = (): void => {
+		this.resetSmoothClock();
 		this.store?.setPlaying(true);
 	};
 
 	private readonly onPause = (): void => {
+		this.resetSmoothClock();
 		this.store?.setPlaying(false);
 	};
 
@@ -50,6 +57,14 @@ class AudioRuntime {
 		this.store?.setPlaying(false);
 		this.store?.setAudioError("Ошибка загрузки аудио");
 	};
+
+	resetSmoothClock(): void {
+		const cur = this.audio.currentTime || 0;
+		this.anchorAudioTime = cur;
+		this.anchorWallTime = performance.now();
+		this.lastAudioTime = cur;
+		this.clockInitialized = true;
+	}
 
 	attachStore(store: PlayerStore): void {
 		this.store = store;
@@ -86,6 +101,7 @@ class AudioRuntime {
 	async setPlaying(playing: boolean): Promise<void> {
 		if (!playing) {
 			this.audio.pause();
+			this.resetSmoothClock();
 			return;
 		}
 
@@ -100,6 +116,7 @@ class AudioRuntime {
 			if (res !== undefined) {
 				await res;
 			}
+			this.resetSmoothClock();
 			this.store?.setPlaying(true);
 			this.store?.setAudioError("");
 		} catch (error) {
@@ -111,11 +128,48 @@ class AudioRuntime {
 	seek(time: number): void {
 		if (Number.isFinite(time)) {
 			this.audio.currentTime = Math.max(0, time);
+			this.resetSmoothClock();
 		}
 	}
 
 	get currentTime(): number {
 		return this.audio.currentTime;
+	}
+
+	get smoothTime(): number {
+		const rawTime = this.audio.currentTime;
+		if (this.audio.paused) {
+			this.anchorAudioTime = rawTime;
+			this.anchorWallTime = performance.now();
+			this.lastAudioTime = rawTime;
+			return rawTime;
+		}
+
+		if (!this.clockInitialized) {
+			this.resetSmoothClock();
+			return rawTime;
+		}
+
+		const now = performance.now();
+		const elapsedSec = (now - this.anchorWallTime) / 1000;
+		const estimatedTime = this.anchorAudioTime + elapsedSec;
+
+		if (rawTime !== this.lastAudioTime) {
+			this.lastAudioTime = rawTime;
+			const drift = rawTime - estimatedTime;
+
+			if (Math.abs(drift) > 0.3) {
+				// Real jump/seek or buffer underrun: re-anchor immediately
+				this.anchorAudioTime = rawTime;
+				this.anchorWallTime = now;
+				return rawTime;
+			}
+
+			// Gentle drift low-pass filter to align clocks smoothly without jumps
+			this.anchorAudioTime += drift * 0.25;
+		}
+
+		return Math.max(0, this.anchorAudioTime + (now - this.anchorWallTime) / 1000);
 	}
 
 	get isPaused(): boolean {
