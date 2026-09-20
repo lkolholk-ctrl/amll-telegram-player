@@ -1,27 +1,24 @@
 <script setup lang="ts">
-import SidebarShell from "@/components/SidebarShell.vue";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import LyricPlayer from "./components/MainPlayer.vue";
 </script>
+
 <template>
-	<SidebarProvider>
-		<SidebarShell variant="inset" />
-		<SidebarInset class="relative overflow-hidden">
-			<LyricPlayer />
-		</SidebarInset>
-	</SidebarProvider>
+	<main class="w-screen h-screen overflow-hidden bg-black text-white relative">
+		<LyricPlayer />
+	</main>
 </template>
+
 <style>
 html,
 body,
 #app {
 	margin: 0;
-	min-height: 100%;
+	padding: 0;
+	width: 100vw;
+	height: 100vh;
 	overflow: hidden;
-}
-
-:root {
-	scrollbar-width: thin;
-	scrollbar-color: var(--border) transparent;
+	background-color: #000000;
+	-webkit-tap-highlight-color: transparent;
+	user-select: none;
 }
 </style>
