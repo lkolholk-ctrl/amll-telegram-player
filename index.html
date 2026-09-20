@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>LMG Apple Music Lyrics</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="bg-container"></div>
+    <div id="fallback-bg"></div>
+
+    <div id="app">
+      <!-- Top header with track info & close button -->
+      <header id="header">
+        <div class="header-left">
+          <img id="cover-img" src="" alt="Album Cover" class="cover-thumb hidden" />
+          <div class="track-meta">
+            <h1 id="track-title">Загрузка...</h1>
+            <p id="track-artist"></p>
+          </div>
+        </div>
+        <div class="header-right">
+          <span id="timing-badge" class="badge">Syllable TTML</span>
+        </div>
+      </header>
+
+      <!-- Center Lyric Container (AMLL Core mounts here) -->
+      <main id="lyric-container">
+        <div id="loading-spinner">
+          <div class="spinner"></div>
+          <p id="loading-text">Загрузка слоговой лирики...</p>
+        </div>
+      </main>
+
+      <!-- Bottom Player Controls -->
+      <footer id="footer">
+        <div class="progress-bar-container" id="progress-container">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+          </div>
+          <div class="time-labels">
+            <span id="current-time">0:00</span>
+            <span id="total-time">0:00</span>
+          </div>
+        </div>
+
+        <div class="controls-row">
+          <button id="btn-rewind" class="btn-ctrl" title="-10 сек">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.2 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
+              <text x="12" y="16" font-size="8" font-weight="bold" text-anchor="middle" fill="currentColor">10</text>
+            </svg>
+          </button>
+
+          <button id="btn-play" class="btn-play-pause" title="Воспроизведение / Пауза">
+            <svg id="icon-play" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6 4 20 12 6 20 6 4"></polygon>
+            </svg>
+            <svg id="icon-pause" class="hidden" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+              <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+            </svg>
+          </button>
+
+          <button id="btn-forward" class="btn-ctrl" title="+10 сек">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.5 8c2.65 0 5.05.99 6.9 2.6L22 7v9h-9l3.62-3.62c-1.39-1.2-3.16-1.88-5.12-1.88-3.54 0-6.55 2.31-7.6 5.5l-2.37-.78C2.92 11.03 6.85 8 11.5 8z"/>
+              <text x="12" y="16" font-size="8" font-weight="bold" text-anchor="middle" fill="currentColor">10</text>
+            </svg>
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <audio id="audio-player" preload="auto" playsinline></audio>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
