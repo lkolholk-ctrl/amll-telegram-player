@@ -34,6 +34,34 @@ if (window.Telegram?.WebApp) {
   }
 }
 
+// Built-in Demo and Popular Track Audio Mapping
+const DEMO_PRESETS: Record<string, { title: string; artist: string; audio: string; cover: string }> = {
+  chihiro: {
+    title: 'CHIHIRO',
+    artist: 'Billie Eilish',
+    audio: '/player/audio/chihiro.mp3',
+    cover: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/92/9f/69/929f69f1-9977-3a44-d674-11f70c852d1b/24UMGIM36186.rgb.jpg/600x600bb.jpg',
+  },
+  numb: {
+    title: 'Numb',
+    artist: 'Linkin Park',
+    audio: '/player/audio/numb.mp3',
+    cover: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/13/44/05/134405bd-9e27-a678-8953-b5f724201f95/093624948988.jpg/600x600bb.jpg',
+  },
+  'blinding lights': {
+    title: 'Blinding Lights',
+    artist: 'The Weeknd',
+    audio: '/player/audio/blinding_lights.mp3',
+    cover: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/bf/16/91/bf16911d-ef1f-d7d8-3a9d-b4b3c004c356/24UMGIM39255.rgb.jpg/600x600bb.jpg',
+  },
+  'in the end': {
+    title: 'In The End',
+    artist: 'Linkin Park',
+    audio: '/player/audio/in_the_end.mp3',
+    cover: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/53/a7/7f/53a77fab-c54c-a57b-8130-248fc12d0c80/093624948995.jpg/600x600bb.jpg',
+  },
+};
+
 // 2. DOM Elements
 const trackTitleEl = document.getElementById('track-title') as HTMLHeadingElement;
 const trackArtistEl = document.getElementById('track-artist') as HTMLParagraphElement;
@@ -68,7 +96,7 @@ const searchInput = document.getElementById('search-input') as HTMLInputElement;
 let parsedLines: LyricLine[] = [];
 let isPlaying = false;
 let currentTimeSec = 0;
-let durationSec = 180; // default duration if no audio
+let durationSec = 180;
 let lastTimeMs = performance.now();
 let playerInstance: LyricPlayer | null = null;
 let bgRenderer: BackgroundRender<MeshGradientRenderer> | null = null;
@@ -90,6 +118,8 @@ playerInstance = new LyricPlayer();
 playerInstance.setWordFadeWidth(0.5);
 playerInstance.setEnableBlur(true);
 playerInstance.setEnableScale(true);
+playerInstance.setAlignAnchor('center');
+playerInstance.setAlignPosition(0.38);
 
 const playerEl = playerInstance.getElement();
 playerEl.style.width = '100%';
@@ -109,7 +139,6 @@ playerInstance.addEventListener('click', (e: any) => {
   }
 });
 
-// Helper: Format Seconds to M:SS
 function formatTime(sec: number): string {
   if (!Number.isFinite(sec) || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
@@ -124,7 +153,7 @@ function seekTo(targetSec: number) {
   }
   if (playerInstance) {
     playerInstance.setCurrentTime(currentTimeSec * 1000, true);
-    playerInstance.update();
+    playerInstance.update(16);
   }
   updateUIProgress();
 }
@@ -134,8 +163,11 @@ function play() {
   lastTimeMs = performance.now();
   iconPlay.classList.add('hidden');
   iconPause.classList.remove('hidden');
+
   if (hasRealAudio) {
-    audioEl.play().catch((e) => console.warn('Audio play error:', e));
+    audioEl.play().catch((e) => {
+      console.warn('Audio play autoplay policy:', e);
+    });
   }
   if (playerInstance) {
     playerInstance.resume();
@@ -149,6 +181,7 @@ function pause() {
   isPlaying = false;
   iconPlay.classList.remove('hidden');
   iconPause.classList.add('hidden');
+
   if (hasRealAudio) {
     audioEl.pause();
   }
@@ -203,28 +236,31 @@ audioEl.addEventListener('ended', () => {
   seekTo(0);
 });
 
-// 5. Main RAF Render Loop
+// 5. Main RAF Render Loop (FIX: Pass deltaMs to update physics & autoscroll!)
 function renderLoop() {
   const now = performance.now();
-  const delta = (now - lastTimeMs) / 1000;
+  const deltaMs = Math.min(now - lastTimeMs, 100);
   lastTimeMs = now;
 
   if (isPlaying) {
     if (hasRealAudio) {
       currentTimeSec = audioEl.currentTime;
     } else {
-      currentTimeSec += delta;
+      currentTimeSec += deltaMs / 1000;
       if (currentTimeSec >= durationSec) {
         pause();
         currentTimeSec = 0;
       }
     }
-
-    if (playerInstance) {
-      playerInstance.setCurrentTime(currentTimeSec * 1000);
-      playerInstance.update();
-    }
     updateUIProgress();
+  }
+
+  if (playerInstance) {
+    if (isPlaying) {
+      playerInstance.setCurrentTime(currentTimeSec * 1000);
+    }
+    // CRITICAL FIX: Pass delta in milliseconds so spring solver moves and autoscrolls!
+    playerInstance.update(deltaMs);
   }
 
   requestAnimationFrame(renderLoop);
@@ -250,19 +286,29 @@ async function loadTrack(opts: TrackOptions) {
   loadingSpinnerEl.classList.remove('hidden');
   loadingTextEl.textContent = 'Загрузка слоговой лирики...';
 
+  // Check presets if no explicit audio provided
+  const searchKey = (opts.title || '').trim().toLowerCase();
+  const preset = DEMO_PRESETS[searchKey];
+  if (preset) {
+    if (!opts.audio) opts.audio = preset.audio;
+    if (!opts.cover) opts.cover = preset.cover;
+    if (!opts.artist) opts.artist = preset.artist;
+    if (!opts.title) opts.title = preset.title;
+  }
+
   const title = opts.title || (opts.id ? 'Apple Track' : 'Демо');
   const artist = opts.artist || '';
 
   trackTitleEl.textContent = title;
   trackArtistEl.textContent = artist;
 
-  // Cover image
+  // Cover image & WebGL background
   if (opts.cover) {
     coverImgEl.src = opts.cover;
     coverImgEl.classList.remove('hidden');
     if (bgRenderer) {
       bgRenderer.setAlbum(opts.cover).then(() => {
-        fallbackBgEl.style.opacity = '0.2';
+        fallbackBgEl.style.opacity = '0.15';
       }).catch((e) => console.warn('bg album set error:', e));
     }
   } else {
@@ -270,7 +316,7 @@ async function loadTrack(opts: TrackOptions) {
     fallbackBgEl.style.opacity = '1';
   }
 
-  // Audio setup
+  // Audio stream setup
   if (opts.audio) {
     hasRealAudio = true;
     audioEl.src = opts.audio;
@@ -343,16 +389,21 @@ async function loadTrack(opts: TrackOptions) {
       durationSec = Math.ceil(lastLine.endTime / 1000) + 5;
     }
 
-    // Feed lines to player
-    playerInstance?.setLyricLines(parsedLines, 0);
-    playerInstance?.setCurrentTime(0, true);
-    playerInstance?.update();
+    // Feed lines to player and align
+    if (playerInstance) {
+      playerInstance.setLyricLines(parsedLines, 0);
+      playerInstance.setAlignAnchor('center');
+      playerInstance.setAlignPosition(0.38);
+      playerInstance.setCurrentTime(0, true);
+      playerInstance.resetScroll();
+      playerInstance.update(16);
+    }
 
     // Hide spinner
     loadingSpinnerEl.classList.add('hidden');
     updateUIProgress();
 
-    // Auto-play demo or audio
+    // Start playback
     play();
   } catch (err: any) {
     console.error('Failed to load lyrics:', err);
@@ -415,7 +466,7 @@ document.querySelectorAll('.chip').forEach((chip) => {
   });
 });
 
-// 8. Initial Load: from URL parameters or default demo
+// 8. Initial Load: from URL parameters or CHIHIRO demo
 const urlParams = new URLSearchParams(window.location.search);
 const initTitle = urlParams.get('title') || '';
 const initArtist = urlParams.get('artist') || '';
@@ -434,9 +485,9 @@ if (initId || initTitle) {
     audio: initAudio,
   });
 } else {
-  // Default interactive demo
+  // Default to CHIHIRO with full real audio & artwork
   loadTrack({
-    title: 'Numb',
-    artist: 'Linkin Park',
+    title: 'CHIHIRO',
+    artist: 'Billie Eilish',
   });
 }
