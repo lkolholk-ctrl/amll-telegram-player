@@ -43,19 +43,52 @@ function formatTime(sec: number): string {
 	return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function triggerHaptic(type: "light" | "medium" = "light"): void {
+	try {
+		(window as any).Telegram?.WebApp?.HapticFeedback?.impactOccurred(type);
+	} catch {}
+}
+
+function togglePlay(): void {
+	triggerHaptic("medium");
+	if (player.audio.playing) {
+		player.setPlaying(false);
+		void audioRuntime.setPlaying(false);
+		lyricPlayerRef.value?.pause();
+	} else {
+		player.setPlaying(true);
+		void audioRuntime.setPlaying(true);
+		lyricPlayerRef.value?.resume();
+	}
+}
+
+function rewind10(): void {
+	triggerHaptic("light");
+	const target = Math.max(0, player.audio.currentTime - 10);
+	player.seek(target);
+	audioRuntime.seek(target);
+	lyricPlayerRef.value?.setCurrentTime(Math.round(target * 1000), true);
+}
+
+function forward10(): void {
+	triggerHaptic("light");
+	const target = Math.min(player.audio.duration, player.audio.currentTime + 10);
+	player.seek(target);
+	audioRuntime.seek(target);
+	lyricPlayerRef.value?.setCurrentTime(Math.round(target * 1000), true);
+}
+
 function onProgressClick(e: MouseEvent): void {
 	const el = e.currentTarget as HTMLElement;
 	if (!el || !player.audio.duration) return;
 	const rect = el.getBoundingClientRect();
 	const clickX = e.clientX - rect.left;
 	const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-	player.seek(ratio * player.audio.duration);
-}
-
-function triggerHaptic(type: "light" | "medium" = "light"): void {
-	try {
-		(window as any).Telegram?.WebApp?.HapticFeedback?.impactOccurred(type);
-	} catch {}
+	const target = ratio * player.audio.duration;
+	player.seek(target);
+	audioRuntime.seek(target);
+	lyricPlayerRef.value?.setCurrentTime(Math.round(target * 1000), true);
+	triggerHaptic("light");
 }
 
 function applyLyricSettings(): void {
@@ -115,9 +148,9 @@ async function loadLyric(): Promise<void> {
 		const songwriters = extractSongwriters(metadata);
 		applySongwriters(songwriters);
 
-		// Start playback
-		if (player.source.musicUrl && !player.audio.playing) {
-			void audioRuntime.setPlaying(true);
+		// If playing, keep in sync
+		if (player.audio.playing) {
+			lyricPlayer.resume();
 		}
 	} catch (error) {
 		if (revision !== lyricLoadRevision) return;
@@ -157,7 +190,7 @@ function seekCoreToStoreTime(): void {
 function startFrameLoop(): void {
 	const onFrame = (time: number) => {
 		if (lastFrameTime === -1) lastFrameTime = time;
-		const delta = time - lastFrameTime;
+		const delta = Math.min(time - lastFrameTime, 100);
 		const lyricPlayer = lyricPlayerRef.value;
 
 		if (!audioRuntime.isPaused) {
@@ -187,9 +220,11 @@ function onLineClick(event: Event): void {
 	event.stopImmediatePropagation();
 	const targetTime = lineEvent.line.getLine().startTime / 1000;
 	player.seek(targetTime);
+	audioRuntime.seek(targetTime);
+	lyricPlayerRef.value?.setCurrentTime(Math.round(targetTime * 1000), true);
 	triggerHaptic("light");
 	if (!player.audio.playing) {
-		void audioRuntime.setPlaying(true);
+		togglePlay();
 	}
 }
 
@@ -201,6 +236,10 @@ function selectPresetTrack(item: typeof PRESET_TRACKS[0]): void {
 	player.source.lyricName = `${item.title}.ttml`;
 	isSearchOpen.value = false;
 	triggerHaptic("medium");
+	// Auto play selected track
+	setTimeout(() => {
+		togglePlay();
+	}, 200);
 }
 
 function handleSearchSubmit(): void {
@@ -232,7 +271,7 @@ function handleSearchSubmit(): void {
 				if (track.artworkUrl100) {
 					player.setAlbumUrl(track.artworkUrl100.replace("100x100bb.jpg", "600x600bb.jpg"));
 				}
-				if (track.previewUrl && !player.source.musicUrl) {
+				if (track.previewUrl) {
 					player.setMusicUrl(track.previewUrl);
 				}
 			}
@@ -260,19 +299,19 @@ function onGlobalKeyDown(event: KeyboardEvent): void {
 
 	if (event.code === "Space") {
 		event.preventDefault();
-		player.togglePlayback();
+		togglePlay();
 		return;
 	}
 
 	if (event.code === "ArrowLeft") {
 		event.preventDefault();
-		player.seek(player.audio.currentTime - 5);
+		rewind10();
 		return;
 	}
 
 	if (event.code === "ArrowRight") {
 		event.preventDefault();
-		player.seek(player.audio.currentTime + 5);
+		forward10();
 	}
 }
 
@@ -444,14 +483,14 @@ watch(
 					variant="ghost"
 					size="icon"
 					class="w-10 h-10 rounded-full text-white/80 hover:text-white hover:bg-white/20 active:scale-90 transition"
-					@click.stop="player.seek(player.audio.currentTime - 10); triggerHaptic('light')"
+					@click.stop="rewind10"
 				>
 					<RotateCcw class="w-5 h-5" />
 				</Button>
 				<Button
 					size="icon"
 					class="w-14 h-14 rounded-full bg-white text-black hover:bg-white/90 active:scale-92 shadow-2xl transition flex items-center justify-center cursor-pointer"
-					@click.stop="player.togglePlayback(); triggerHaptic('medium')"
+					@click.stop="togglePlay"
 				>
 					<PauseIcon v-if="player.audio.playing" class="w-6 h-6 fill-current" />
 					<PlayIcon v-else class="w-6 h-6 fill-current ml-0.5" />
@@ -460,7 +499,7 @@ watch(
 					variant="ghost"
 					size="icon"
 					class="w-10 h-10 rounded-full text-white/80 hover:text-white hover:bg-white/20 active:scale-90 transition"
-					@click.stop="player.seek(player.audio.currentTime + 10); triggerHaptic('light')"
+					@click.stop="forward10"
 				>
 					<RotateCw class="w-5 h-5" />
 				</Button>

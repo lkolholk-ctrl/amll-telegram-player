@@ -3,14 +3,21 @@ import type { usePlayerStore } from "@/stores/player";
 type PlayerStore = ReturnType<typeof usePlayerStore>;
 
 class AudioRuntime {
-	private readonly audio = document.createElement("audio");
+	readonly audio = document.createElement("audio");
 	private store: PlayerStore | undefined;
 	private source = "";
 
 	constructor() {
 		this.audio.preload = "auto";
-		this.audio.volume = 0.5;
-		this.audio.style.display = "none";
+		this.audio.volume = 1.0;
+		(this.audio as any).playsInline = true;
+		this.audio.setAttribute("playsinline", "true");
+		this.audio.setAttribute("webkit-playsinline", "true");
+		this.audio.style.position = "absolute";
+		this.audio.style.opacity = "0";
+		this.audio.style.pointerEvents = "none";
+		this.audio.style.width = "1px";
+		this.audio.style.height = "1px";
 		this.audio.addEventListener("play", this.onPlay);
 		this.audio.addEventListener("pause", this.onPause);
 		this.audio.addEventListener("ended", this.onEnded);
@@ -33,12 +40,15 @@ class AudioRuntime {
 	};
 
 	private readonly onLoadedMetadata = (): void => {
-		this.store?.setDuration(this.audio.duration);
+		if (Number.isFinite(this.audio.duration) && this.audio.duration > 0) {
+			this.store?.setDuration(this.audio.duration);
+		}
 	};
 
 	private readonly onError = (): void => {
+		console.warn("Audio element error:", this.audio.error);
 		this.store?.setPlaying(false);
-		this.store?.setAudioError("音频加载失败");
+		this.store?.setAudioError("Ошибка загрузки аудио");
 	};
 
 	attachStore(store: PlayerStore): void {
@@ -82,17 +92,19 @@ class AudioRuntime {
 		if (!this.audio.src) return;
 
 		if (this.audio.ended) {
-			this.store?.seek(0);
+			this.seek(0);
 		}
 
 		try {
-			await this.audio.play();
+			const res = this.audio.play();
+			if (res !== undefined) {
+				await res;
+			}
+			this.store?.setPlaying(true);
 			this.store?.setAudioError("");
 		} catch (error) {
+			console.warn("Audio play error:", error);
 			this.store?.setPlaying(false);
-			this.store?.setAudioError(
-				error instanceof Error ? error.message : String(error),
-			);
 		}
 	}
 

@@ -1,8 +1,9 @@
+import "@applemusic-like-lyrics/core/style.css";
+import "./assets/index.tailwind.css";
+
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
-
-import "./assets/index.tailwind.css";
 
 declare global {
 	interface Window {
@@ -12,6 +13,10 @@ declare global {
 				expand: () => void;
 				setHeaderColor: (color: string) => void;
 				setBackgroundColor: (color: string) => void;
+				HapticFeedback?: {
+					impactOccurred: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
+					selectionChanged: () => void;
+				};
 			};
 		};
 	}
