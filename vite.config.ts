@@ -1,14 +1,17 @@
-import { defineConfig } from 'vite';
+import { fileURLToPath, URL } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
+import vue from "@vitejs/plugin-vue";
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: '/player/',
-  server: {
-    port: 3000,
-    host: '0.0.0.0',
+  base: "/player/",
+  define: {
+    __AMLL_CORE_VERSION__: JSON.stringify("0.6.0"),
   },
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-    target: 'es2020',
+  plugins: [vue(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
   },
 });
